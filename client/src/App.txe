@@ -1,0 +1,242 @@
+// App.js
+import { useState, useEffect, useRef } from 'react';
+import styled from 'styled-components';
+import io from 'socket.io-client';
+
+const Wrapper = styled.div`
+  width: 100vw;
+  height: 100vh;
+  background-color: yellow;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+`;
+
+const MessageInputArea = styled.div`
+  width: 100%;
+  height: 20%;
+  background-color: red;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  padding: 10px;
+`;
+
+const MessageContainer = styled.div`
+  width: 90%;
+  height: 80%;
+  background-color: green;
+  display: flex;
+  justify-content: space-between;
+`;
+
+const MessageList = styled.div`
+  background-color: lightblue;
+  width: 70%;
+  padding: 10px;
+  overflow-y: auto;
+`;
+
+const ActiveUserList = styled.div`
+  background-color: violet;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  width: 30%;
+`;
+
+const StyledInput = styled.input`
+  padding: 6px;
+  margin: 5px;
+`;
+
+const StyledButton = styled.button`
+  padding: 6px 12px;
+  margin: 5px;
+  cursor: pointer;
+`;
+
+function App() {
+  const [roomChat, setRoomChat] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState("");
+  const [msg, setMsg] = useState("");
+  const [masList, setMasList] = useState([]);
+  const [groupMasList, setGroupMasList] = useState([]);
+  const [allGroupList, setAllGroupList] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [tergetUser, setTergetUser] = useState("");
+  const [tergetGroup, setTergetGroup] = useState("");
+  const socketRef = useRef(null);
+  const [roomName, setRoomName] = useState("");
+  const [isOn, setIsOn] = useState(false);
+  const ulList = useRef(null);
+
+  const handleToggle = () => {
+    setIsOn(!isOn);
+    setRoomChat(!roomChat);
+  };
+
+  const masgOnChangeFun = (e) => {
+    setMsg(e.target.value);
+  };
+
+  const sendMsg = () => {
+    if (msg.trim() !== "") {
+      if (tergetUser.trim() !== "") {
+        socketRef.current.emit("send_massage", { msg, user: tergetUser, userName });
+      } else {
+        if (roomChat) {
+          socketRef.current.emit("send_group_massage", { msg, tergetGroup, userName });
+        } else {
+          socketRef.current.emit("send_massage", { msg, userName });
+        }
+      }
+      setMsg("");
+    } else {
+      alert("Write a message");
+    }
+  };
+
+  const creatRoomFun = () => {
+    socketRef.current.emit("creatRoom", roomName);
+  };
+
+  function creatChatList(text, index) {
+    return <li key={index}>{text.userName}: {text.msg}</li>;
+  }
+
+  function creatRoomChatList(text, index) {
+    return <li key={index}>{text.data.userName}: {text.data.msg}</li>;
+  }
+
+  function creatOptionList(user, nameType, index) {
+    return (
+      <label key={index}>
+        <input
+          type="radio"
+          name={nameType}
+          value={user.userId}
+          onChange={(e) => setTergetUser(e.target.value)}
+        />
+        {user.userName}
+      </label>
+    );
+  }
+
+  function creatOptionListFGroup(user, nameType, index) {
+    return (
+      <label key={index}>
+        <input
+          type="radio"
+          name={nameType}
+          value={user.joinRoomName}
+          onChange={(e) => setTergetGroup(e.target.value)}
+        />
+        {user.joinRoomName}
+      </label>
+    );
+  }
+
+  useEffect(() => {
+    const id = window.prompt("Enter your user ID:");
+    const name = window.prompt("What is your name:");
+
+    setUserId(id || "anonymousId");
+    setUserName(name || "Anonymous");
+
+    const socket = io.connect('http://localhost:3001', {
+      query: { userId: id || "anonymousId" }
+    });
+
+    socketRef.current = socket;
+
+    socket.on("server_massage", (massage) => {
+      setMasList(prev => [...prev, massage]);
+    });
+
+    socket.on("server_group_massage", (massage) => {
+      setGroupMasList(prev => [...prev, massage]);
+    });
+
+    socket.on("new_user_connected", (userData) => {
+      setAllUsers(prev => [...prev, userData]);
+    });
+
+    socket.on("new_group_connected", (userData) => {
+      setAllGroupList(prev => [...prev, userData]);
+    });
+
+    socket.emit("user_connected", {
+      userId: id || "anonymousId",
+      userName: name || "Anonymous"
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  return (
+    <Wrapper>
+      <MessageInputArea>
+        <StyledInput type="text" value={msg} onChange={masgOnChangeFun} />
+        <StyledButton onClick={sendMsg}>Send</StyledButton>
+      </MessageInputArea>
+
+      <MessageContainer>
+        {roomChat ? (
+          <MessageList>
+            <h4>Room Chat</h4>
+            <ul>{groupMasList.map((mas, index) => creatRoomChatList(mas, index))}</ul>
+          </MessageList>
+        ) : (
+          <MessageList>
+            <h4>Private Chat</h4>
+            <ul ref={ulList}>{masList.map((mas, index) => creatChatList(mas, index))}</ul>
+          </MessageList>
+        )}
+
+        <ActiveUserList>
+          <StyledButton onClick={handleToggle}>
+            {isOn ? 'Turn On' : 'Turn Off'}
+          </StyledButton>
+
+          <StyledInput
+            type="text"
+            value={roomName}
+            onChange={e => setRoomName(e.target.value)}
+            placeholder="Room name"
+          />
+          <StyledButton onClick={creatRoomFun}>Create Room</StyledButton>
+
+          <h4>Active Users:</h4>
+          <label>
+            <input
+              type="radio"
+              name='activeUserList'
+              value=""
+              onChange={(e) => setTergetUser(e.target.value)}
+            />
+            All Users
+          </label>
+          {allUsers.map((user, index) => creatOptionList(user, "activeUserList", index))}
+
+          <h4>All Group List:</h4>
+          <label>
+            <input
+              type="radio"
+              name='activeGroupList'
+              value=""
+              onChange={(e) => setTergetUser(e.target.value)}
+            />
+            No Group
+          </label>
+          {allGroupList.map((group, index) => creatOptionListFGroup(group, "activeGroupList", index))}
+        </ActiveUserList>
+      </MessageContainer>
+    </Wrapper>
+  );
+}
+
+export default App;
