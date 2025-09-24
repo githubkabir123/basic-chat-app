@@ -1,3 +1,4 @@
+require("dotenv").config();
 const cors = require("cors");
 const path = require("path");
 const express = require("express");
@@ -8,10 +9,11 @@ const {Server} = require("socket.io");
 
 const io = new Server(server,{
     cors : {
-        origin : "http://localhost:5173",
+        origin : process.env.FRONTEND_URL || "*",
         methods: ["GET", "POST", "DELET"],
     }
 });
+console.log(process.env.FRONTEND_URL)
 const userSocketMap = new Map();
 let activeUserList = [];
 io.on("connection", (socket)=>{
@@ -20,16 +22,14 @@ io.on("connection", (socket)=>{
     userSocketMap.set(userId, socket.id);
 
     socket.on("creatRoom",(joinRoomName)=>{
+        socket.join(joinRoomName);
         socket.emit("new_group_connected", {joinRoomName ,groupId: socket.id})
     })
-    // socket.on("creatRoom",(joinRoomName)=>{
-    //     console.log(joinRoomName)
-    //     socket.join(joinRoomName);
-    //     socket.emit("new_group_connected", {joinRoomName ,groupId: socket.id})
-    // })
+    
 
     socket.on("send_group_massage",(data)=>{
-        io.to(data.tergetGroup).emit("server_group_massage", {data})
+        console.log(data);
+        io.to(data.tergetGroup).emit("server_group_massage", data)
     })
 
     socket.on("user_connected", (userData)=>{
@@ -58,6 +58,6 @@ io.on("connection", (socket)=>{
 app.use(cors());
 app.use(express.static(path.join(__dirname,"/public")))
 
-server.listen(3001,()=>{
-    console.log("Server Has Started on posrt 3001")
+server.listen(process.env.PORT || 5000,()=>{
+    console.log(`Server Has Started on port ${process.env.PORT || 5000}`)
 })

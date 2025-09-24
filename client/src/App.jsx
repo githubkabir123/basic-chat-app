@@ -108,7 +108,7 @@ const creatRoomFun = ()=>{
   }
   function creatRoomChatList(text, index) {
     
-    return <li key={index}>{text.data.userName} : {text.data.msg}</li>;
+    return <li key={index}>{text.userName} : {text.msg}</li>;
   }
 
   function creatOptionList(user,nameType, index) {
@@ -145,8 +145,8 @@ const creatRoomFun = ()=>{
 
     setUserId(id || "anonymousId");
     setUserName(name || "Anonymous");
-
-    const socket = io.connect('http://localhost:3001', {
+    console.log(import.meta.env.VITE_BASEURL);
+    const socket = io.connect(`${import.meta.env.VITE_BASEURL}`, {
       query: { userId: id || "anonymousId" }
     });
 
@@ -157,6 +157,7 @@ const creatRoomFun = ()=>{
     });
 
     socket.on("server_group_massage", (massage) => {
+      console.log(massage);
       setGroupMasList(prev => [...prev, massage]);
     });
 
